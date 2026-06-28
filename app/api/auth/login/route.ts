@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   const rows = await sql`select password_hash from users where email = ${email}`;
-  if (rows.length === 0) {
+  if (rows.length === 0 || !rows[0].password_hash) {
     return Response.json({ error: "邮箱或密码不正确" }, { status: 401 });
   }
 
