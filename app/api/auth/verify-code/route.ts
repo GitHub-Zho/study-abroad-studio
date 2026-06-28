@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { getDb } from "@/lib/db";
+import { getDb, MAX_CODE_ATTEMPTS } from "@/lib/db";
 import { getResend, FROM_ADDRESS } from "@/lib/resend";
 
 export async function POST(request: Request) {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   }
 
   const rows = await sql`
-    select code, expires_at from verification_codes where email = ${email}
+    select code, expires_at, attempts from verification_codes where email = ${email}
   `;
   if (rows.length === 0) {
     return Response.json({ error: "请先获取验证码" }, { status: 400 });
@@ -23,7 +23,11 @@ export async function POST(request: Request) {
   if (new Date(rows[0].expires_at as string) < new Date()) {
     return Response.json({ error: "验证码已过期，请重新获取" }, { status: 400 });
   }
+  if ((rows[0].attempts as number) >= MAX_CODE_ATTEMPTS) {
+    return Response.json({ error: "尝试次数太多，请重新获取验证码" }, { status: 429 });
+  }
   if (rows[0].code !== code) {
+    await sql`update verification_codes set attempts = attempts + 1 where email = ${email}`;
     return Response.json({ error: "验证码不正确" }, { status: 400 });
   }
 

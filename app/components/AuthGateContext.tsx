@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode } from "react";
+import { useSession, signIn } from "next-auth/react";
 
 interface AuthGateValue {
   isLoggedIn: boolean;
@@ -22,7 +23,8 @@ const inputClass =
   "w-full bg-[var(--navy-light)] border border-[var(--gold)]/40 rounded text-[14px] px-3 py-2.5 focus:outline-none focus:border-[var(--gold)]";
 
 export function AuthGateProvider({ children }: { children: ReactNode }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { data: session, status } = useSession();
+  const isLoggedIn = status === "authenticated" && !!session;
   const [reason, setReason] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("login");
   const [signupStep, setSignupStep] = useState<SignupStep>("email");
@@ -58,17 +60,11 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "登录失败");
+      const res = await signIn("credentials", { email, password, redirect: false });
+      if (res?.error) {
+        setError("邮箱或密码不正确");
         return;
       }
-      setIsLoggedIn(true);
       close();
     } catch {
       setError("网络错误，请稍后重试");
