@@ -47,11 +47,11 @@ function SetPasswordForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="block text-[13px] text-[var(--gold-soft)] mb-2">设置你的密码</label>
+        <label className="block text-[13px] text-[var(--gold-soft)] mb-2">设置你的密码（至少8位）</label>
         <input
           type="password"
           required
-          minLength={6}
+          minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full bg-[var(--navy-light)] border border-[var(--gold)]/40 rounded text-[15px] px-4 py-3 focus:outline-none focus:border-[var(--gold)]"

@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import { getResend, FROM_ADDRESS, emailLayout } from "@/lib/resend";
 
 interface ApplyPayload {
   nickname: string;
@@ -91,34 +91,50 @@ export async function POST(request: Request) {
   }
 
   const data = body;
-  const resendKey = process.env.RESEND_API_KEY;
+  const resend = getResend();
   const adminEmail = process.env.ADMIN_EMAIL;
-  const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
 
-  if (!resendKey || !adminEmail) {
+  if (!resend || !adminEmail) {
     return Response.json(
       { error: "服务尚未配置完成（缺少邮件服务密钥）" },
       { status: 500 }
     );
   }
 
-  const resend = new Resend(resendKey);
   const summary = renderSummary(data);
+  const summaryHtml = summary
+    .split("\n")
+    .map((line) => `<p style="margin:0 0 6px;">${line}</p>`)
+    .join("");
 
   try {
-    await resend.emails.send({
-      from: fromAddress,
+    const adminResult = await resend.emails.send({
+      from: FROM_ADDRESS,
       to: adminEmail,
       subject: `新申请意向：${data.nickname}`,
       text: summary,
+      html: emailLayout(summaryHtml),
     });
+    if (adminResult.error) {
+      console.error("Resend rejected admin notification email", adminResult.error);
+      return Response.json({ error: "邮件发送失败，请稍后重试" }, { status: 502 });
+    }
 
-    await resend.emails.send({
-      from: fromAddress,
+    const applicantResult = await resend.emails.send({
+      from: FROM_ADDRESS,
       to: data.email,
       subject: "已收到你的申请意向 · 超级无敌厉害留学咨询工作室",
       text: `你好 ${data.nickname}，\n\n我们已经收到你的申请意向，会在一周之内联系你。\n\n以下是你填写的内容：\n\n${summary}\n\n超级无敌厉害留学咨询工作室`,
+      html: emailLayout(`
+        <p style="margin:0 0 16px;">你好 ${data.nickname}，</p>
+        <p style="margin:0 0 20px;">我们已经收到你的申请意向，会在一周之内联系你。以下是你填写的内容：</p>
+        ${summaryHtml}
+      `),
     });
+    if (applicantResult.error) {
+      console.error("Resend rejected applicant confirmation email", applicantResult.error);
+      return Response.json({ error: "邮件发送失败，请稍后重试" }, { status: 502 });
+    }
   } catch (err) {
     console.error("Resend email failed", err);
     return Response.json({ error: "邮件发送失败，请稍后重试" }, { status: 502 });

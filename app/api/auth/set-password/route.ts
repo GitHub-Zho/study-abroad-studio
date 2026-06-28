@@ -8,8 +8,8 @@ export async function POST(request: Request) {
   }
 
   const { token, password } = await request.json();
-  if (typeof token !== "string" || typeof password !== "string" || password.length < 6) {
-    return Response.json({ error: "请填写至少6位的密码" }, { status: 400 });
+  if (typeof token !== "string" || typeof password !== "string" || password.length < 8) {
+    return Response.json({ error: "请填写至少8位的密码" }, { status: 400 });
   }
 
   const rows = await sql`

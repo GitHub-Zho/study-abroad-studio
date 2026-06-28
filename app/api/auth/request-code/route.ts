@@ -1,5 +1,5 @@
 import { getDb, ensureSchema, RESEND_COOLDOWN_SECONDS } from "@/lib/db";
-import { getResend, FROM_ADDRESS } from "@/lib/resend";
+import { getResend, FROM_ADDRESS, emailLayout } from "@/lib/resend";
 
 function isValidEmail(email: unknown): email is string {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -44,12 +44,28 @@ export async function POST(request: Request) {
     on conflict (email) do update set code = excluded.code, expires_at = excluded.expires_at, attempts = 0, last_sent_at = now()
   `;
 
-  await resend.emails.send({
-    from: FROM_ADDRESS,
-    to: email,
-    subject: "你的验证码 · 超级无敌厉害留学咨询工作室",
-    text: `你的验证码是：${code}\n\n10分钟内有效，请勿告诉他人。`,
-  });
+  try {
+    const result = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: email,
+      subject: "你的验证码 · 超级无敌厉害留学咨询工作室",
+      text: `你的验证码是：${code}\n\n10分钟内有效，请勿告诉他人。`,
+      html: emailLayout(`
+        <p style="margin:0 0 16px;">你的验证码是：</p>
+        <p style="text-align:center;margin:0 0 16px;">
+          <span style="display:inline-block;font-size:28px;font-weight:500;letter-spacing:6px;color:#c9a227;">${code}</span>
+        </p>
+        <p style="margin:0;color:#9fb0c5;font-size:12px;">10分钟内有效，请勿告诉他人。</p>
+      `),
+    });
+    if (result.error) {
+      console.error("Resend rejected verification code email", result.error);
+      return Response.json({ error: "邮件发送失败，请稍后重试" }, { status: 502 });
+    }
+  } catch (err) {
+    console.error("Failed to send verification code email", err);
+    return Response.json({ error: "邮件发送失败，请稍后重试" }, { status: 502 });
+  }
 
   return Response.json({ ok: true });
 }
